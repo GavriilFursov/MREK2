@@ -25,8 +25,8 @@ const float MM_PER_STEP = SCREW_PITCH / STEPS_PER_REV;
 const float L1 = 183.0f;
 const float L2 = 80.0f;
 
-const float ORIGINAL_FOURIER_CYCLE_TIME = 1.134f;
-float time_scale_factor = 8.0f / 1.134f;
+const float ORIGINAL_FOURIER_CYCLE_TIME = 1.130f;
+float time_scale_factor = 8.0f / 1.130f;
 
 inline float angleToLength(float target_angle, const limbSegment& segment) {
     float buf_rad = radians(segment.baseAngle - target_angle);
@@ -136,6 +136,8 @@ inline void mainControl() {
             if(isSSChange()) {
                 mode = 0;
                 trajectoryStartTime = 0;
+                leftHip.setSpeed(50);
+                leftKnee.setSpeed(50);
             }
 
             switch (mode) {
@@ -167,42 +169,54 @@ inline void mainControl() {
                         leftKnee.run(1);
 
                         if(leftHip.positionComlited() && leftKnee.positionComlited()) {
-                            leftHip.setSpeed(200);
-                            leftKnee.setSpeed(180);
+                            leftHip.setSpeed(1800);
+                            leftKnee.setSpeed(2500);
                             trajectoryStartTime = millis();
                             mode = 1;
                         }
                     }
-
+                    
                 } break;
-            
+                
                 case 1: {
                     float elapsed_time = (millis() - trajectoryStartTime) / 1000.0f;
                     float trajectory_progress = fmod(elapsed_time, ORIGINAL_FOURIER_CYCLE_TIME * time_scale_factor);
                     float normalized_time = trajectory_progress / (ORIGINAL_FOURIER_CYCLE_TIME * time_scale_factor);
                     
+                    // leftHip.readResponse();
+                    // directKinematics(radians(stepsToAngle((float)leftHip.getPosition(), hip)), -1 * radians(stepsToAngle((float)leftKnee.getPosition(), knee)));
+                    // Serial.print(A2X);
+                    // Serial.print(" , ");
+                    // Serial.print(A2Z);
+                    // Serial.print(" , ");
+                    // Serial.print(xDes - 0.32f);
+                    // Serial.print(" , ");
+                    // Serial.print(zDes - 0.88f);
+                    // Serial.print(" , ");
+                    // Serial.println(millis());
+
+                    // Serial.print(stepsToAngle(leftHip.getPosition(), hip));
+                    // Serial.print(" , ");
+                    // Serial.print(-1 * stepsToAngle(leftKnee.getPosition(), knee));
+                    // Serial.print(" , ");
+                    // Serial.print(degrees(q1Des));
+                    // Serial.print(" , ");
+                    // Serial.print(degrees(q21Des));
+                    // Serial.print(" , ");
+                    // Serial.println(millis());
+
                     fourierTrajectory(normalized_time);
-
+                    
                     inverseKinematics(xDes - 0.32f, zDes - 0.88f, q1Des, q21Des, A0X, A0Z);
-
+                    
                     leftHip.setPulseAbsolutePosition(angleToSteps(degrees(q1Des), hip));
                     leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * q21Des), knee));
-
+                    
                     leftHip.run(1);
                     leftKnee.run(1);
-
-                    Serial.print(xDes - 0.32f);
-                    Serial.print(" , ");
-                    Serial.println(zDes - 0.88f);
+                    
                 } break;
             }
         } break;
     }   
 }
-
-// directKinematics(radians(stepsToAngle((float)leftHip.getPosition(), hip)), -1 * radians(stepsToAngle((float)leftKnee.getPosition(), knee)));
-
-// Serial.print(A2X);
-// Serial.print(" , ");
-// Serial.print(A2Z);
-// Serial.print(" , ");

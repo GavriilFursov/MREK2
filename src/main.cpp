@@ -10,12 +10,13 @@ void setup() {
   Serial.begin(115200);
   leftHip.begin();
   leftKnee.begin();
+
   leftHip.setSpeed(50);
   leftKnee.setSpeed(50);
-  leftHip.setAcceleration(50);
-  leftKnee.setAcceleration(120);
-  leftHip.setDeceleration(2000);
-  leftKnee.setDeceleration(1500);
+  leftHip.setAcceleration(200);
+  leftKnee.setAcceleration(50);
+  leftHip.setDeceleration(2700);
+  leftKnee.setDeceleration(2500);
 }
 
 void loop() {
