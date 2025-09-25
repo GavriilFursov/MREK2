@@ -1,7 +1,8 @@
 #pragma once
 
-RS485Master leftHip(PA7, newSerial, 7);
-RS485Master leftKnee(PA7, newSerial, 5);
+RS485Master leftHip(PA7, newSerial, 8);
+RS485Master leftKnee(PA7, newSerial, 6);
+RS485Master verticalDrive(PA7, newSerial, 1);
 
 struct limbSegment {
     float length;

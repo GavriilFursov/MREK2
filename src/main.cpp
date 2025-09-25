@@ -10,7 +10,12 @@ void setup() {
   Serial.begin(115200);
   leftHip.begin();
   leftKnee.begin();
-
+  verticalDrive.begin();
+  
+  // verticalDrive.setPulseAbsolutePosition(-300000 * 5);
+  // verticalDrive.setPulseAbsolutePosition(0);
+  // verticalDrive.setSpeed(300);
+  // verticalDrive.run(1);
   leftHip.setSpeed(50);
   leftKnee.setSpeed(50);
   leftHip.setAcceleration(200);
