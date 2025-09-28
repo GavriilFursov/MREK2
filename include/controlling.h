@@ -18,6 +18,8 @@ float A1X = 0.0f,           A1Z = 0.0f;
 float A2X = 0.0f,           A2Z = 0.0f;
 float q1Des = 0.0f,         q21Des = 0.0f;
 float xDes = 0.0f,          zDes = 0.0f;
+float x_offset = -0.24f,    z_offset = -0.884f;
+float Z = 0.0f,             Z_offset = -0.8f;
 
 const long STEPS_PER_REV = 10000;
 const float SCREW_PITCH = 5.0f;
@@ -69,18 +71,35 @@ inline void inverseKinematics(float x_set, float z_set, float rq1, float rq21, f
     q21Des = constrain(q21Des, -1.5708f, -0.0523599f);
 }
 
-inline void fourierTrajectory(float x) {
+inline void fourierTrajectoryA0(float x) {
 
     static const struct {
-        const float a0 = 0.275f;
+        const float a0 = 0.7993f;
+        const float a1 = -0.01475f, b1 = 0.02039f;
+        const float a2 = 0.01295f, b2 = 0.01187f;
+        const float a3 = 0.0004541f, b3 = 0.005872f;
+        const float a4 = 0.0007899f, b4 = -0.004689f;
+        const float a5 = 2.812e-05f, b5 = -0.003282f;
+        const float w = 3.805f;
+    } zp;
+    
+    float wz = x * zp.w;
+    Z = zp.a0 + zp.a1 * cosf(wz) + zp.b1 * sinf(wz) +  zp.a2 * cosf(2*wz) + zp.b2 * sinf(2*wz) + zp.a3 * cosf(3*wz) + zp.b3 * sinf(3*wz) + 
+        zp.a4 * cosf(4*wz) + zp.b4 * sinf(4*wz) + zp.a5 * cosf(5*wz) + zp.b5 * sinf(5*wz);
+}
+
+inline void fourierTrajectoryA2(float x) {
+
+    static const struct {
+        const float a0 = 0.25f;
         const float a1 = -0.212f, b1 = 0.08912f;
         const float a2 = -0.02665f, b2 = -0.04015f;
         const float a3 = 0.01219f, b3 = -4.207e-4f;
-        const float w = 5.312f;
+        const float w = 5.5f;
     } xp;
     
     static const struct {
-        const float a0 = 0.09473f;
+        const float a0 = 0.09f;
         const float a1 = 0.03905f, b1 = 0.001059f;
         const float a2 = -0.0002675f, b2 = 0.004628f;
         const float a3 = -0.01259f, b3 = 0.01509f;
@@ -148,10 +167,10 @@ inline void mainControl() {
 
                     directKinematics(currentQ1, currentQ21);
                     
-                    fourierTrajectory(0.0f);
+                    fourierTrajectoryA2(0.0f);
 
-                    float stepX = ((xDes - 0.32) - A2X) / INTERPOLATION_STEPS;
-                    float stepZ = ((zDes - 0.88) - A2Z) / INTERPOLATION_STEPS;          
+                    float stepX = ((xDes + x_offset) - A2X) / INTERPOLATION_STEPS;
+                    float stepZ = ((zDes + z_offset) - A2Z) / INTERPOLATION_STEPS;          
                     
                     for(int i = 0; i <= INTERPOLATION_STEPS; i++) {
                         float interpX = A2X + (i * stepX);
@@ -184,6 +203,17 @@ inline void mainControl() {
                     float trajectory_progress = fmod(elapsed_time, ORIGINAL_FOURIER_CYCLE_TIME * time_scale_factor);
                     float normalized_time = trajectory_progress / (ORIGINAL_FOURIER_CYCLE_TIME * time_scale_factor);
                     
+                    fourierTrajectoryA0(normalized_time);
+                    fourierTrajectoryA2(normalized_time);
+                    
+                    inverseKinematics(xDes + x_offset, zDes + z_offset, q1Des, q21Des, A0X, Z + Z_offset);
+                    
+                    leftHip.setPulseAbsolutePosition(angleToSteps(degrees(q1Des), hip));
+                    leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * q21Des), knee));
+                    
+                    leftHip.run(1);
+                    leftKnee.run(1);
+                    
                     // leftHip.readResponse();
                     // directKinematics(radians(stepsToAngle((float)leftHip.getPosition(), hip)), -1 * radians(stepsToAngle((float)leftKnee.getPosition(), knee)));
                     // Serial.print(A2X);
@@ -195,7 +225,7 @@ inline void mainControl() {
                     // Serial.print(zDes - 0.88f);
                     // Serial.print(" , ");
                     // Serial.println(millis());
-
+        
                     // Serial.print(stepsToAngle(leftHip.getPosition(), hip));
                     // Serial.print(" , ");
                     // Serial.print(-1 * stepsToAngle(leftKnee.getPosition(), knee));
@@ -205,17 +235,6 @@ inline void mainControl() {
                     // Serial.print(degrees(q21Des));
                     // Serial.print(" , ");
                     // Serial.println(millis());
-
-                    fourierTrajectory(normalized_time);
-                    
-                    inverseKinematics(xDes - 0.32f, zDes - 0.88f, q1Des, q21Des, A0X, A0Z);
-                    
-                    leftHip.setPulseAbsolutePosition(angleToSteps(degrees(q1Des), hip));
-                    leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * q21Des), knee));
-                    
-                    leftHip.run(1);
-                    leftKnee.run(1);
-                    
                 } break;
             }
         } break;
