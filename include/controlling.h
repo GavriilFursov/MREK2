@@ -21,9 +21,11 @@ float A1X = 0.0f,           A1Z = 0.0f;
 float A2X = 0.0f,           A2Z = 0.0f;
 float q1Des = 0.0f,         q21Des = 0.0f;
 float xDes = 0.0f,          zDes = 0.0f;
-float x_offset = -0.24f,    z_offset = -0.884f;
+float x_offset = -0.24f,    z_offset = -0.884f; 
 float Z = 0.0f,             Z_offset = -0.8f;
 float q3Des = 0.0f;
+const float alphaBetta = 141.05f;
+const float zOffsetForVertical = 363.28f;
 
 const long STEPS_PER_REV = 10000;
 const float SCREW_PITCH = 5.0f;
@@ -34,6 +36,7 @@ const float L2 = 80.0f;
 
 const float L1_VERTICAL_DRIVE = 412.25f;
 const float L2_VERTICAL_DRIVE = 420.0f;
+const float L4_VERTICAL_DRIVE = 800.0f;
 
 const float ORIGINAL_FOURIER_CYCLE_TIME = 1.130f;
 float time_scale_factor = 8.0f / 1.130f;
@@ -49,15 +52,15 @@ inline long angleToSteps(float target_angle, const limbSegment& segment) {
     return (long)(length_offset / MM_PER_STEP);
 }
 
-inline float angleToLengthVerticalDrive(float target_angle, const limbSegment& segment) {
-    float buf_rad = radians(segment.baseAngle - target_angle);
-    return sqrt(L1_VERTICAL_DRIVE*L1_VERTICAL_DRIVE + L2_VERTICAL_DRIVE*L2_VERTICAL_DRIVE - 2*L1_VERTICAL_DRIVE*L2_VERTICAL_DRIVE*cosf(buf_rad));
+inline float heightToLength(float target_height, const limbSegment& segment) {
+    float beta_des_rad = alphaBetta - 90.0f - degrees(asin((target_height*1000 - zOffsetForVertical)/L4_VERTICAL_DRIVE));
+    return sqrt(L1_VERTICAL_DRIVE*L1_VERTICAL_DRIVE + L2_VERTICAL_DRIVE*L2_VERTICAL_DRIVE - 2*L1_VERTICAL_DRIVE*L2_VERTICAL_DRIVE*cosf(radians(beta_des_rad)));
 }
 
-inline long angleToStepsVerticalDrive(float target_angle, const limbSegment& segment) {
-    float target_length = angleToLengthVerticalDrive(target_angle, segment);
-    float length_offset = segment.zeroLength - target_length;
-    return (long)(length_offset / MM_PER_STEP);
+inline float heightToSteps(float target_height, const limbSegment& segment) {
+    float length = heightToLength(target_height , segment);
+    float target_length = length - segment.zeroLength;
+    return (long)(target_length / MM_PER_STEP);
 }
 
 inline float stepsToLength(long target_steps, const limbSegment& segment) {
@@ -235,9 +238,9 @@ inline void mainControl() {
                         leftFoot.run(1);
 
                         if(leftHip.positionComlited() && leftKnee.positionComlited() && leftFoot.positionComlited()) {
-                            leftHip.setSpeed(1800);
-                            leftKnee.setSpeed(2500);
-                            leftFoot.setSpeed(1500);
+                            leftHip.setSpeed(3000);
+                            leftKnee.setSpeed(3000);
+                            leftFoot.setSpeed(3000);
                             trajectoryStartTime = millis();
                             mode = 1;
                         }
@@ -252,17 +255,29 @@ inline void mainControl() {
                     
                     fourierTrajectoryA0(normalized_time);
                     fourierTrajectoryA2(normalized_time);
-                    // fourierTrajectoryQ3(normalized_time);
-                    
+                    fourierTrajectoryQ3(normalized_time);
+
                     inverseKinematics(xDes + x_offset, zDes + z_offset, q1Des, q21Des, A0X, Z + Z_offset);
                     
                     leftHip.setPulseAbsolutePosition(angleToSteps(degrees(q1Des), hip));
                     leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * q21Des), knee));
-                    // leftFoot.setPulseAbsolutePosition(angleToSteps(q3Des, foot));
+                    leftFoot.setPulseAbsolutePosition(angleToSteps(q3Des, foot));
 
                     leftHip.run(1);
                     leftKnee.run(1);
-                    // leftFoot.run(1);
+                    leftFoot.run(1);
+
+                    // leftHip.readResponse();
+                    // directKinematics(radians(stepsToAngle((float)leftHip.getPosition(), hip)), -1 * radians(stepsToAngle((float)leftKnee.getPosition(), knee)));
+                    // Serial.print(A2X);
+                    // Serial.print(" , ");
+                    // Serial.print(A2Z);
+                    // Serial.print(" , ");
+                    // Serial.print(xDes + x_offset);
+                    // Serial.print(" , ");
+                    // Serial.print(zDes + z_offset);
+                    // Serial.print(" , ");
+                    // Serial.println(millis());
                     
                 } break;
             }
