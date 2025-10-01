@@ -11,10 +11,10 @@ struct limbSegment {
     float zeroLength;
 };
 
-limbSegment hip = { 0.42f, 118.73f, 232.3002f };
-limbSegment knee = { 0.44f, 125.0f, 238.08f };
-limbSegment foot = { 0.0f,  90.0f, 199.72f };
-limbSegment verticalDriver = { 0.0f,  15.36f, 114.49f };
+limbSegment hip =                       { 0.42f, 118.73f, 232.3002f };
+limbSegment knee =                      { 0.44f, 125.0f, 238.08f };
+limbSegment foot =                      { 0.0f,  90.0f, 199.72f };
+limbSegment hipJointVertical =          { 0.0f,  15.36f, 114.49f };
 
 float A0X = 0.0f,           A0Z = 0.0f;
 float A1X = 0.0f,           A1Z = 0.0f;
@@ -25,7 +25,6 @@ float x_offset = -0.24f,    z_offset = -0.884f;
 float Z = 0.0f,             Z_offset = -0.8f;
 float q3Des = 0.0f;
 const float alphaBetta = 141.05f;
-const float zOffsetForVertical = 363.28f;
 
 const long STEPS_PER_REV = 10000;
 const float SCREW_PITCH = 5.0f;
@@ -39,7 +38,7 @@ const float L2_VERTICAL_DRIVE = 420.0f;
 const float L4_VERTICAL_DRIVE = 800.0f;
 
 const float ORIGINAL_FOURIER_CYCLE_TIME = 1.130f;
-float time_scale_factor = 8.0f / 1.130f;
+float time_scale_factor = 7.0f / 1.130f;
 
 inline float angleToLength(float target_angle, const limbSegment& segment) {
     float buf_rad = radians(segment.baseAngle - target_angle);
@@ -53,11 +52,11 @@ inline long angleToSteps(float target_angle, const limbSegment& segment) {
 }
 
 inline float heightToLength(float target_height, const limbSegment& segment) {
-    float beta_des_rad = alphaBetta - 90.0f - degrees(asin((target_height*1000 - zOffsetForVertical)/L4_VERTICAL_DRIVE));
-    return sqrt(L1_VERTICAL_DRIVE*L1_VERTICAL_DRIVE + L2_VERTICAL_DRIVE*L2_VERTICAL_DRIVE - 2*L1_VERTICAL_DRIVE*L2_VERTICAL_DRIVE*cosf(radians(beta_des_rad)));
+    float beta_des_rad = alphaBetta - 90.0f - degrees(asin((target_height * 1000) / L4_VERTICAL_DRIVE));
+    return sqrt(L1_VERTICAL_DRIVE * L1_VERTICAL_DRIVE + L2_VERTICAL_DRIVE * L2_VERTICAL_DRIVE - 2 * L1_VERTICAL_DRIVE * L2_VERTICAL_DRIVE*cosf(radians(beta_des_rad)));
 }
 
-inline float heightToSteps(float target_height, const limbSegment& segment) {
+inline long heightToSteps(float target_height, const limbSegment& segment) {
     float length = heightToLength(target_height , segment);
     float target_length = length - segment.zeroLength;
     return (long)(target_length / MM_PER_STEP);
@@ -143,6 +142,8 @@ inline void fourierTrajectoryA2(float x) {
 inline void setStopMotors() {
     leftHip.run(0);
     leftKnee.run(0);
+    leftFoot.run(0);
+    verticalDrive.run(0);
 }
 
 inline void fourierTrajectoryQ3(float x){
@@ -204,6 +205,7 @@ inline void mainControl() {
                 leftHip.setSpeed(50);
                 leftKnee.setSpeed(50);
                 leftFoot.setSpeed(50);
+                verticalDrive.setSpeed(100);
             }
 
             switch (mode) {
@@ -232,15 +234,19 @@ inline void mainControl() {
                         leftHip.setPulseAbsolutePosition(angleToSteps(degrees(currentQ1), hip));
                         leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * currentQ21), knee));
                         leftFoot.setPulseAbsolutePosition(angleToSteps(q3Des, foot));
+                        verticalDrive.setPulseAbsolutePosition(-1 * 5 * heightToSteps(0.300f, hipJointVertical));
 
                         leftHip.run(1);
                         leftKnee.run(1);
                         leftFoot.run(1);
+                        verticalDrive.run(1);
 
-                        if(leftHip.positionComlited() && leftKnee.positionComlited() && leftFoot.positionComlited()) {
+                        if(leftHip.positionComlited() && leftKnee.positionComlited() && 
+                           leftFoot.positionComlited() && verticalDrive.positionComlited()) {
                             leftHip.setSpeed(3000);
                             leftKnee.setSpeed(3000);
                             leftFoot.setSpeed(3000);
+                            verticalDrive.setSpeed(3000);
                             trajectoryStartTime = millis();
                             mode = 1;
                         }
@@ -262,22 +268,12 @@ inline void mainControl() {
                     leftHip.setPulseAbsolutePosition(angleToSteps(degrees(q1Des), hip));
                     leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * q21Des), knee));
                     leftFoot.setPulseAbsolutePosition(angleToSteps(q3Des, foot));
+                    verticalDrive.setPulseAbsolutePosition(-1 * 5 * heightToSteps(0.300f + Z + Z_offset, hipJointVertical));
 
                     leftHip.run(1);
                     leftKnee.run(1);
                     leftFoot.run(1);
-
-                    // leftHip.readResponse();
-                    // directKinematics(radians(stepsToAngle((float)leftHip.getPosition(), hip)), -1 * radians(stepsToAngle((float)leftKnee.getPosition(), knee)));
-                    // Serial.print(A2X);
-                    // Serial.print(" , ");
-                    // Serial.print(A2Z);
-                    // Serial.print(" , ");
-                    // Serial.print(xDes + x_offset);
-                    // Serial.print(" , ");
-                    // Serial.print(zDes + z_offset);
-                    // Serial.print(" , ");
-                    // Serial.println(millis());
+                    verticalDrive.run(1);
                     
                 } break;
             }
