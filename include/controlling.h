@@ -1,9 +1,9 @@
 #pragma once
 
-RS485Master leftHip(PA7, newSerial, 8);
-RS485Master leftKnee(PA7, newSerial, 6);
-RS485Master leftFoot(PA7, newSerial, 4);
-RS485Master verticalDrive(PA7, newSerial, 1);
+RS485Master leftHip             (PA7, newSerial, 8);
+RS485Master leftKnee            (PA7, newSerial, 6);
+RS485Master leftFoot            (PA7, newSerial, 4);
+RS485Master verticalDrive       (PA7, newSerial, 1);
 
 struct limbSegment {
     float length;
@@ -21,8 +21,7 @@ float A1X = 0.0f,           A1Z = 0.0f;
 float A2X = 0.0f,           A2Z = 0.0f;
 float q1Des = 0.0f,         q21Des = 0.0f;
 float xDes = 0.0f,          zDes = 0.0f;
-float x_offset = -0.24f,    z_offset = -0.884f; 
-float Z = 0.0f,             Z_offset = -0.8f;
+float z_offset = -0.085f,   Z = 0.0f;
 float q3Des = 0.0f;
 const float alphaBetta = 141.05f;
 
@@ -37,8 +36,8 @@ const float L1_VERTICAL_DRIVE = 412.25f;
 const float L2_VERTICAL_DRIVE = 420.0f;
 const float L4_VERTICAL_DRIVE = 800.0f;
 
-const float ORIGINAL_FOURIER_CYCLE_TIME = 1.130f;
-float time_scale_factor = 7.0f / 1.130f;
+const float ORIGINAL_FOURIER_CYCLE_TIME = 1.134f;
+float time_cycle = 2.0f;
 
 inline float angleToLength(float target_angle, const limbSegment& segment) {
     float buf_rad = radians(segment.baseAngle - target_angle);
@@ -53,7 +52,7 @@ inline long angleToSteps(float target_angle, const limbSegment& segment) {
 
 inline float heightToLength(float target_height, const limbSegment& segment) {
     float beta_des_rad = alphaBetta - 90.0f - degrees(asin((target_height * 1000) / L4_VERTICAL_DRIVE));
-    return sqrt(L1_VERTICAL_DRIVE * L1_VERTICAL_DRIVE + L2_VERTICAL_DRIVE * L2_VERTICAL_DRIVE - 2 * L1_VERTICAL_DRIVE * L2_VERTICAL_DRIVE*cosf(radians(beta_des_rad)));
+    return sqrt(L1_VERTICAL_DRIVE*L1_VERTICAL_DRIVE + L2_VERTICAL_DRIVE*L2_VERTICAL_DRIVE - 2*L1_VERTICAL_DRIVE*L2_VERTICAL_DRIVE*cosf(radians(beta_des_rad)));
 }
 
 inline long heightToSteps(float target_height, const limbSegment& segment) {
@@ -84,8 +83,8 @@ inline void directKinematics(float q_hip, float q_knee) {
 }
 
 inline void inverseKinematics(float x_set, float z_set, float rq1, float rq21, float x_start, float z_start) {
-    q1Des = -(knee.length + z_set*cos(rq1 + rq21) - z_start*cos(rq1 + rq21) - x_set*sin(rq1 + rq21) + x_start*sin(rq1 + rq21) + hip.length*cos(rq21) - hip.length*rq1*sin(rq21)) / (hip.length*sin(rq21));
-    q21Des = rq21 + ((knee.length*cos(rq1 + rq21) + hip.length*cos(rq1)) * (z_set - z_start + knee.length*cos(rq1 + rq21) + hip.length*cos(rq1))) / (hip.length*knee.length*sin(rq21)) + ((knee.length*sin(rq1 + rq21) + hip.length*sin(rq1)) * (x_start - x_set + knee.length*sin(rq1 + rq21) + hip.length*sin(rq1))) / (hip.length*knee.length*sin(rq21));
+    q1Des = -(knee.length + z_set*cosf(rq1 + rq21) - z_start*cosf(rq1 + rq21) - x_set*sinf(rq1 + rq21) + x_start*sinf(rq1 + rq21) + hip.length*cosf(rq21) - hip.length*rq1*sinf(rq21)) / (hip.length*sinf(rq21));
+    q21Des = rq21 + ((knee.length*cosf(rq1 + rq21) + hip.length*cosf(rq1)) * (z_set - z_start + knee.length*cosf(rq1 + rq21) + hip.length*cosf(rq1))) / (hip.length*knee.length*sinf(rq21)) + ((knee.length*sinf(rq1 + rq21) + hip.length*sinf(rq1)) * (x_start - x_set + knee.length*sinf(rq1 + rq21) + hip.length*sinf(rq1))) / (hip.length*knee.length*sinf(rq21));
     
     q1Des = constrain(q1Des, -0.261799f, 1.48353f);
     q21Des = constrain(q21Des, -1.5708f, -0.0523599f);
@@ -94,40 +93,39 @@ inline void inverseKinematics(float x_set, float z_set, float rq1, float rq21, f
 inline void fourierTrajectoryA0(float x) {
 
     static const struct {
-        const float a0 = 0.7993f;
-        const float a1 = -0.01475f, b1 = 0.02039f;
-        const float a2 = 0.01295f, b2 = 0.01187f;
-        const float a3 = 0.0004541f, b3 = 0.005872f;
-        const float a4 = 0.0007899f, b4 = -0.004689f;
-        const float a5 = 2.812e-05f, b5 = -0.003282f;
-        const float w = 3.805f;
+        const float a0 = 0.006446f;
+        const float a1 = -0.005896f, b1 = -0.003202f;
+        const float a2 = -0.006416f, b2 = 0.01206f;
+        const float a3 = -0.00247f, b3 = -0.0047f;
+        const float w = 5.293f;
     } zp;
-    
-    float wz = x * zp.w;
-    Z = zp.a0 + zp.a1 * cosf(wz) + zp.b1 * sinf(wz) +  zp.a2 * cosf(2*wz) + zp.b2 * sinf(2*wz) + zp.a3 * cosf(3*wz) + zp.b3 * sinf(3*wz) + 
-        zp.a4 * cosf(4*wz) + zp.b4 * sinf(4*wz) + zp.a5 * cosf(5*wz) + zp.b5 * sinf(5*wz);
+        
+    float wx = x * zp.w;
+    Z = zp.a0 + zp.a1*cosf(wx) + zp.b1*sinf(wx) + 
+        zp.a2*cosf(2.0f*wx) + zp.b2*sinf(2.0f*wx) + 
+        zp.a3*cosf(3.0f*wx) + zp.b3*sinf(3.0f*wx);
 }
 
 inline void fourierTrajectoryA2(float x) {
     
     static const struct {
-        const float a0 = 0.25f;
-        const float a1 = -0.212f, b1 = 0.08912f;
-        const float a2 = -0.02665f, b2 = -0.04015f;
-        const float a3 = 0.01219f, b3 = -4.207e-4f;
-        const float w = 5.5f;
+        const float a0 = -0.02088f;
+        const float a1 = -0.2121f, b1 = 0.08801f;
+        const float a2 = -0.02656f, b2 = -0.04049f;
+        const float a3 = 0.01197f, b3 = 0.0063f;
+        const float w = 5.318f;
     } xp;
     
     static const struct {
-        const float a0 = 0.09f;
-        const float a1 = 0.03905f, b1 = 0.001059f;
-        const float a2 = -0.0002675f, b2 = 0.004628f;
-        const float a3 = -0.01259f, b3 = 0.01509f;
-        const float a4 = -0.007607f, b4 = 0.01752f;
-        const float a5 = -0.001034f, b5 = 0.008936f;
-        const float a6 = 0.002177f, b6 = 0.0009939f;
-        const float a7 = 0.002133f, b7 = -0.0004353f;
-        const float w = 4.395f;
+        const float a0 = -0.7083f;
+        const float a1 = 0.03862f, b1 = 0.0001696f;
+        const float a2 = -0.001283f, b2 = 0.004867f;
+        const float a3 = -0.01305f, b3 = 0.0164f;
+        const float a4 = -0.006759f, b4 = 0.01856f;
+        const float a5 = -0.0005151f, b5 = 0.008931f;
+        const float a6 = 0.002308f, b6 = 0.0006881f;
+        const float a7 = 0.00228f, b7 = -0.0005848f;
+        const float w = 4.308f;
     } zp;
     
     float wx = x * xp.w;
@@ -146,7 +144,7 @@ inline void setStopMotors() {
     verticalDrive.run(0);
 }
 
-inline void fourierTrajectoryQ3(float x){
+inline void fourierTrajectoryQ3(float x) {
 
     static const struct {
         const float a0 =        5.99;
@@ -215,26 +213,27 @@ inline void mainControl() {
 
                     directKinematics(currentQ1, currentQ21);
                     
+                    fourierTrajectoryA0(0.0f);
                     fourierTrajectoryA2(0.0f);
                     fourierTrajectoryQ3(0.0f);
 
-                    float stepX = ((xDes + x_offset) - A2X) / INTERPOLATION_STEPS;
+                    float stepX = (xDes - A2X) / INTERPOLATION_STEPS;
                     float stepZ = ((zDes + z_offset) - A2Z) / INTERPOLATION_STEPS;          
                     
                     for(int i = 0; i <= INTERPOLATION_STEPS; i++) {
                         float interpX = A2X + (i * stepX);
                         float interpZ = A2Z + (i * stepZ);
                         
-                        inverseKinematics(interpX, interpZ, currentQ1, currentQ21, A0X, A0Z);
+                        inverseKinematics(interpX, interpZ, currentQ1, currentQ21, A0X, Z);
                         currentQ1 = q1Des;
                         currentQ21 = q21Des;
                     }
 
-                    if(!isnan(currentQ1) && !isnan(currentQ21)){
+                    if(!isnan(currentQ1) && !isnan(currentQ21)) {
                         leftHip.setPulseAbsolutePosition(angleToSteps(degrees(currentQ1), hip));
                         leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * currentQ21), knee));
                         leftFoot.setPulseAbsolutePosition(angleToSteps(q3Des, foot));
-                        verticalDrive.setPulseAbsolutePosition(-1 * 5 * heightToSteps(0.300f, hipJointVertical));
+                        verticalDrive.setPulseAbsolutePosition(-1 * 5 * heightToSteps(0.300f + Z, hipJointVertical));
 
                         leftHip.run(1);
                         leftKnee.run(1);
@@ -256,19 +255,25 @@ inline void mainControl() {
                 
                 case 1: {
                     float elapsed_time = (millis() - trajectoryStartTime) / 1000.0f;
-                    float trajectory_progress = fmod(elapsed_time, ORIGINAL_FOURIER_CYCLE_TIME * time_scale_factor);
-                    float normalized_time = trajectory_progress / (ORIGINAL_FOURIER_CYCLE_TIME * time_scale_factor);
-                    
-                    fourierTrajectoryA0(normalized_time);
-                    fourierTrajectoryA2(normalized_time);
-                    fourierTrajectoryQ3(normalized_time);
 
-                    inverseKinematics(xDes + x_offset, zDes + z_offset, q1Des, q21Des, A0X, Z + Z_offset);
+                    if (elapsed_time >= time_cycle) {
+                        trajectoryStartTime = millis();
+                        elapsed_time = 0.0f;
+                    }
+                    
+                    float normalized_time = elapsed_time / time_cycle;
+                    float fourier_input = normalized_time * ORIGINAL_FOURIER_CYCLE_TIME;
+                    
+                    fourierTrajectoryA0(fourier_input);
+                    fourierTrajectoryA2(fourier_input);
+                    fourierTrajectoryQ3(fourier_input);
+
+                    inverseKinematics(xDes, zDes + z_offset, q1Des, q21Des, A0X, Z);
                     
                     leftHip.setPulseAbsolutePosition(angleToSteps(degrees(q1Des), hip));
                     leftKnee.setPulseAbsolutePosition(angleToSteps(degrees(-1 * q21Des), knee));
                     leftFoot.setPulseAbsolutePosition(angleToSteps(q3Des, foot));
-                    verticalDrive.setPulseAbsolutePosition(-1 * 5 * heightToSteps(0.300f + Z + Z_offset, hipJointVertical));
+                    verticalDrive.setPulseAbsolutePosition(-1 * 5 * heightToSteps(0.300f + Z, hipJointVertical));
 
                     leftHip.run(1);
                     leftKnee.run(1);
